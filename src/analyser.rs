@@ -1,21 +1,27 @@
+use regex::Regex;
 use reqwest::Client;
 
-pub async fn get_count(client: &Client, word: &str) -> Result<u64, reqwest::Error> {
+pub async fn get_count(client: &Client, word: &str) -> Result<String, reqwest::Error> {
     let text = client
         .get(&format!("https://bcc.blcu.edu.cn/zh/search/0/{word}"))
         .send()
         .await?
         .text()
         .await?;
-    let parts: Vec<&str> = text.split("条目数量：").collect();
-    if parts.len() > 1 {
-        parts[1]
-            .split_whitespace()
-            .next()
-            .unwrap_or("0")
-            .parse()
-            .ok()
+
+    if text.contains(&format!("\"input\" value=\"{word}\"")) {
+        let re = Regex::new(r#""totalnum" value="(\d+)"#).unwrap();
+        if let Some(caps) = re.captures(&text) {
+            if let Some(matched) = caps.get(1) {
+                let keyword = matched.as_str().to_string();
+                println!("{word}的词频：{keyword}");
+                return Ok(keyword);
+            }
+        }
+        println!("{word}的词频：-1，网站中没有该词的信息");
+        Ok("-1".to_string())
     } else {
-        Ok(0)
+        println!("{word}的词频：-1，页面错误或有网站不支持的字符");
+        Ok("-1".to_string())
     }
 }
